@@ -20,10 +20,25 @@
 
 #include <math.h>
 
+#include <string.h>
+
 #include "platform.h"
 
 #ifdef USE_MAG_MLX90393
+#include "build/debug.h"
 
+#include "common/axis.h"
+#include "common/maths.h"
+#include "common/utils.h"
+
+#include "drivers/time.h"
+#include "drivers/io.h"
+#include "drivers/bus.h"
+
+#include "drivers/sensor.h"
+#include "drivers/compass/compass.h"
+
+#define DETECTION_MAX_RETRY_COUNT   5
 static bool deviceDetect(magDev_t * mag)
 {
     for (int retryCount = 0; retryCount < DETECTION_MAX_RETRY_COUNT; retryCount++) {
@@ -32,7 +47,7 @@ static bool deviceDetect(magDev_t * mag)
         uint8_t sig = 0;
         bool ack = busRead(mag->busDev, 0b00111111, &sig); //TODO: Start Single Measurement Mode zyxt
 
-        if (ack && (sig & 0b00010000 == 0)) { //TODO: No error
+        if (ack && ((sig & 0b00010000) == 0)) { //TODO: No error
             return true;
         }
     }
@@ -54,17 +69,17 @@ static bool mlx90393Init(magDev_t * mag)
 static bool mlx90393Read(magDev_t * mag)
 {
     bool ack = false;
-    uint8_t buf[8];
+    uint8_t buf[9];
 
-    ack = busReadBuf(mag->busDev, 0b01001110, buf, 8); //TODO: read mesurement zyx
+    ack = busReadBuf(mag->busDev, 0b01001110, buf, 9); //TODO: read mesurement zyx
 
     if (!ack) {
         return false;
     }
 
-    mag->magADCRaw[X] = buf[2] << 8 + buf[3]; //TODO:
-    mag->magADCRaw[Y] = buf[4] << 8 + buf[5]; //TODO:
-    mag->magADCRaw[Z] = buf[6] << 8 + buf[7]; //TODO:
+    mag->magADCRaw[X] = (buf[3] << 8) + buf[4]; //TODO:
+    mag->magADCRaw[Y] = (buf[5] << 8) + buf[6]; //TODO:
+    mag->magADCRaw[Z] = (buf[7] << 8) + buf[8]; //TODO:
 
     return true;
 }
