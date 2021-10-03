@@ -15,14 +15,29 @@
  * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "platform.h"
+
+#ifdef USE_MAG_MLX90393
+
 #include <stdbool.h>
 #include <stdint.h>
 
 #include <math.h>
 
-#include "platform.h"
+#include "build/debug.h"
 
-#ifdef USE_MAG_MLX90393
+#include "common/axis.h"
+#include "common/maths.h"
+#include "common/utils.h"
+
+#include "drivers/time.h"
+#include "drivers/io.h"
+#include "drivers/bus.h"
+
+#include "drivers/sensor.h"
+#include "drivers/compass/compass.h"
+
+#define DETECTION_MAX_RETRY_COUNT   5
 
 static bool deviceDetect(magDev_t * mag)
 {
@@ -32,7 +47,7 @@ static bool deviceDetect(magDev_t * mag)
         uint8_t sig = 0;
         bool ack = busRead(mag->busDev, 0b00111111, &sig); //TODO: Start Single Measurement Mode zyxt
 
-        if (ack && (sig & 0b00010000 == 0)) { //TODO: No error
+        if (ack && ((sig & 0b00010000) == 0)) { //TODO: No error
             return true;
         }
     }
@@ -62,9 +77,9 @@ static bool mlx90393Read(magDev_t * mag)
         return false;
     }
 
-    mag->magADCRaw[X] = buf[2] << 8 + buf[3]; //TODO:
-    mag->magADCRaw[Y] = buf[4] << 8 + buf[5]; //TODO:
-    mag->magADCRaw[Z] = buf[6] << 8 + buf[7]; //TODO:
+    mag->magADCRaw[X] = (buf[2] << 8) + buf[3]; //TODO:
+    mag->magADCRaw[Y] = (buf[4] << 8) + buf[5]; //TODO:
+    mag->magADCRaw[Z] = (buf[6] << 8) + buf[7]; //TODO:
 
     return true;
 }
