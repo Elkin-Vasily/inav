@@ -37,6 +37,16 @@
 #include "drivers/sensor.h"
 #include "drivers/compass/compass.h"
 
+#define MLX90393_MESURE_Z                           0b00001000
+#define MLX90393_MESURE_Y                           0b00000100
+#define MLX90393_MESURE_X                           0b00000010
+#define MLX90393_MESURE_T                           0b00000001
+
+#define MLX90393_START_BURST_MODE                   0b00010000 //uses with zyxt flags
+#define MLX90393_START_WAKE_UP_ON_CHANGE_MODE       0b00100000 //uses with zyxt flags
+#define MLX90393_START_MESUREMENT_MODE              0b00110000 //uses with zyxt flags
+#define MLX90393_READ_MESUREMENT                    0b01000000 //uses with zyxt flags
+
 #define DETECTION_MAX_RETRY_COUNT   5
 
 static bool deviceDetect(magDev_t * mag)
@@ -45,7 +55,7 @@ static bool deviceDetect(magDev_t * mag)
         delay(10);
 
         uint8_t sig = 0;
-        bool ack = busRead(mag->busDev, 0b00111111, &sig); //TODO: Start Single Measurement Mode zyxt
+        bool ack = busRead(mag->busDev, MLX90393_START_MESUREMENT_MODE | MLX90393_MESURE_Z | MLX90393_MESURE_Y | MLX90393_MESURE_X | MLX90393_MESURE_T, &sig); //TODO: Start Single Measurement Mode zyxt
 
         if (ack && ((sig & 0b00010000) == 0)) { //TODO: No error
             return true;
@@ -60,7 +70,7 @@ static bool mlx90393Init(magDev_t * mag)
     bool ack;
     UNUSED(ack);
 
-    ack = busWrite(mag->busDev, 0b00011110, 0); //TODO: burst mode zyx
+    ack = busWrite(mag->busDev, MLX90393_START_MESUREMENT_MODE | MLX90393_MESURE_Z | MLX90393_MESURE_Y | MLX90393_MESURE_X | MLX90393_MESURE_T, 0); //TODO: Start Single Measurement Mode zyxt (if device was reset after deviceDetect)
     delay(20);
 
     return true;
@@ -71,7 +81,7 @@ static bool mlx90393Read(magDev_t * mag)
     bool ack = false;
     uint8_t buf[8];
 
-    ack = busReadBuf(mag->busDev, 0b01001110, buf, 8); //TODO: read mesurement zyx
+    ack = busReadBuf(mag->busDev, MLX90393_READ_MESUREMENT | MLX90393_MESURE_Z | MLX90393_MESURE_Y | MLX90393_MESURE_X | MLX90393_MESURE_T, buf, 8); //TODO: read mesurement zyxt
 
     if (!ack) {
         return false;
