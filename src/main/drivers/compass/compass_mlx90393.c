@@ -84,9 +84,9 @@ static bool mlx90393Init(magDev_t * mag)
 static bool mlx90393Read(magDev_t * mag)
 {
     bool ack = false;
-    uint8_t buf[8] = {0};
+    uint8_t buf[7] = {0};
 
-    ack = busWrite(mag->busDev, MLX90393_START_MESUREMENT_MODE | MLX90393_MESURE_Z | MLX90393_MESURE_Y | MLX90393_MESURE_X | MLX90393_MESURE_T, 0); //TODO: Start Single Measurement Mode zyxt (if device was reset after deviceDetect)
+    ack = busWrite(mag->busDev, MLX90393_START_MESUREMENT_MODE | MLX90393_MESURE_Z | MLX90393_MESURE_Y | MLX90393_MESURE_X, 0); //TODO: Start Single Measurement Mode zyx
 
     if (!ack) {
         return false;
@@ -94,15 +94,15 @@ static bool mlx90393Read(magDev_t * mag)
 
     delay(10);
 
-    ack = busReadBuf(mag->busDev, MLX90393_READ_MESUREMENT | MLX90393_MESURE_Z | MLX90393_MESURE_Y | MLX90393_MESURE_X | MLX90393_MESURE_T, buf, 8); //TODO: read mesurement zyxt
+    ack = busReadBuf(mag->busDev, MLX90393_READ_MESUREMENT | MLX90393_MESURE_Z | MLX90393_MESURE_Y | MLX90393_MESURE_X, buf, 7); //TODO: read mesurement zyx
 
     if (!ack) {
         return false;
     }
 
-    mag->magADCRaw[X] = (buf[2] << 8) + buf[3]; //TODO:
-    mag->magADCRaw[Y] = (buf[4] << 8) + buf[5]; //TODO:
-    mag->magADCRaw[Z] = (buf[6] << 8) + buf[7]; //TODO:
+    mag->magADCRaw[X] = (buf[1] << 8) + buf[2]; //TODO:
+    mag->magADCRaw[Y] = (buf[3] << 8) + buf[4]; //TODO:
+    mag->magADCRaw[Z] = (buf[5] << 8) + buf[6]; //TODO:
 
     return true;
 }
