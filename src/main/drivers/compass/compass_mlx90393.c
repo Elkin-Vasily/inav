@@ -48,14 +48,14 @@
 #define MLX90393_READ_MEASUREMENT                    0b01000000 //uses with zyxt flags
 
 #define MLX90393_RESET                               0b11110000
-#define MLX90393_RESET_FLAG			     0b00000100
+#define MLX90393_RESET_FLAG                          0b00000100
 
 #define DETECTION_MAX_RETRY_COUNT   5
 
 static bool deviceDetect(magDev_t * mag)
 {
     for (int retryCount = 0; retryCount < DETECTION_MAX_RETRY_COUNT; retryCount++) {
-	uint8_t sig = 0;
+        uint8_t sig = 0;
         bool ack = busRead(mag->busDev, MLX90393_RESET, &sig);
         delay(20);
  
@@ -88,9 +88,9 @@ static bool mlx90393Read(magDev_t * mag)
         return false;
     }
 
-    mag->magADCRaw[X] = (buf[1] << 8) + buf[2]; //TODO:
-    mag->magADCRaw[Y] = (buf[3] << 8) + buf[4]; //TODO:
-    mag->magADCRaw[Z] = (buf[5] << 8) + buf[6]; //TODO:
+    mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[2]); //TODO:
+    mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[4]); //TODO:
+    mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[6]); //TODO:
 
     return true;
 }
