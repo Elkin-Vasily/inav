@@ -264,7 +264,7 @@
     #if !defined(MLX90393_I2C_BUS)
         #define MLX90393_I2C_BUS MAG_I2C_BUS
     #endif
-    BUSDEV_REGISTER_I2C(busdev_mlx90393,     DEVHW_MLX90393,      MLX90393_I2C_BUS,    0x0C,               NONE,           DEVFLAGS_NONE,  0); //TODO: check this
+    BUSDEV_REGISTER_I2C(busdev_mlx90393,     DEVHW_MLX90393,      MLX90393_I2C_BUS,    0x0C,               NONE,           DEVFLAGS_NONE,  0);
 #endif
 
 #endif

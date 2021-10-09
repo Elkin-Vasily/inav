@@ -217,6 +217,61 @@ bool i2cRead(I2CDevice device, uint8_t addr_, uint8_t reg_, uint8_t len, uint8_t
     return true;
 }
 
+bool i2cExtWriteBuffer(I2CDevice device, uint8_t addr_, uint16_t reg_, uint8_t len_, const uint8_t *data, bool allowRawAccess)
+{
+    if (device == I2CINVALID)
+        return false;
+
+    i2cState_t * state = &(i2cState[device]);
+
+    if (!state->initialised)
+        return false;
+
+    HAL_StatusTypeDef status;
+
+    if ((reg_ == 0xFF || len_ == 0) && allowRawAccess) {
+        status = HAL_I2C_Master_Transmit(&state->handle, addr_ << 1, (uint8_t *)data, len_, I2C_DEFAULT_TIMEOUT);
+    }
+    else {
+        status = HAL_I2C_Mem_Write(&state->handle, addr_ << 1, reg_, I2C_MEMADD_SIZE_16BIT, (uint8_t *)data, len_, I2C_DEFAULT_TIMEOUT);
+    }
+
+    if (status != HAL_OK)
+        return i2cHandleHardwareFailure(device);
+
+    return true;
+}
+
+bool i2cExtWrite(I2CDevice device, uint8_t addr_, uint16_t reg_, uint8_t data, bool allowRawAccess)
+{
+    return i2cExtWriteBuffer(device, addr_, reg_, 1, &data, allowRawAccess);
+}
+
+bool i2cExtRead(I2CDevice device, uint8_t addr_, uint16_t reg_, uint8_t len, uint8_t* buf, bool allowRawAccess)
+{
+    if (device == I2CINVALID)
+        return false;
+
+    i2cState_t * state = &(i2cState[device]);
+
+    if (!state->initialised)
+        return false;
+
+    HAL_StatusTypeDef status;
+
+    if (reg_ == 0xFF && allowRawAccess) {
+        status = HAL_I2C_Master_Receive(&state->handle, addr_ << 1,buf, len, I2C_DEFAULT_TIMEOUT);
+    }
+    else {
+        status = HAL_I2C_Mem_Read(&state->handle, addr_ << 1, reg_, I2C_MEMADD_SIZE_16BIT, buf, len, I2C_DEFAULT_TIMEOUT);
+    }
+
+    if (status != HAL_OK)
+        return i2cHandleHardwareFailure(device);
+
+    return true;
+}
+
 /*
  * Compute SCLDEL, SDADEL, SCLH and SCLL for TIMINGR register according to reference manuals.
  */

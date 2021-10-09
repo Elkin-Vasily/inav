@@ -66,6 +66,75 @@
 
 #define DETECTION_MAX_RETRY_COUNT   5
 
+#define REG_BUF_LEN                 3
+
+#define GAIN_SEL_AND_HALLCONF_REG   0x0 //from datasheet 0x0 << 2 = 0x0 
+#define GAIN_SEL_MASK               0x0070
+#define GAIN_SEL_SHIFT              4
+
+#define HALLCONF_MASK               0x000f
+#define HALLCONF_SHIFT              0
+
+#define TCMP_EN_REG                 0x4 //from datasheet 0x1 << 2 = 0x4
+#define TCMP_EN_MASK                0x0400
+#define TCMP_EN_SHIFT               10
+
+#define RES_XYZ_REG                 0x8 //from datasheet 0x2 << 2 = 0x8 
+#define RES_XYZ_MASK                0x07e0
+#define RES_XYZ_SHIFT               5
+
+float gain_multipliers[8] = {5.f, 4.f, 3.f, 2.5f, 2.f, 1.66666667f, 1.33333333f, 1.f};
+// for hallconf = 0
+float base_xy_sens_hc0 = 0.196f;
+float base_z_sens_hc0 = 0.316f;
+// for hallconf = 0xc
+float base_xy_sens_hc0xc = 0.150f;
+float base_z_sens_hc0xc = 0.242f;
+
+struct mlx90393_struct {
+    uint8_t gain_sel;
+    uint8_t hallconf;
+    uint8_t tcmp_en;
+    uint8_t res_x;
+    uint8_t res_y;
+    uint8_t res_z;
+};
+
+struct mlx90393_struct mlx90393 = {0};
+
+static bool mlx90393SetGainSel(magDev_t * mag, uint8_t gain_sel)
+{
+    uint16_t old_val, new_val;
+    uint8_t buf[REG_BUF_LEN] = {0};
+
+    bool ack = busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_AND_HALLCONF_REG, buf, REG_BUF_LEN);
+
+    if (!ack) {
+        return false;
+    }
+
+    //buf[0] - status byte
+    old_val = ((uint16_t)buf[1] << 8) | buf[2];
+
+    new_val = (old_val & ~GAIN_SEL_MASK) | (((uint16_t)gain_sel << GAIN_SEL_SHIFT) & GAIN_SEL_MASK);
+
+    LOG_D(SYSTEM, "mlx90393SetGainSel old_val: 0x%04X new_val: 0x%04X", old_val, new_val);
+
+    buf[0] = (new_val >> 8) & 0xFF;
+    buf[1] = (new_val >> 0) & 0xFF;
+    buf[2] = GAIN_SEL_AND_HALLCONF_REG;
+
+    ack = busWriteBuf(mag->busDev, MLX90393_WRITE_REGISTER, buf, REG_BUF_LEN);
+
+    if (!ack) {
+        return false;
+    }
+
+    mlx90393.gain_sel = gain_sel;
+
+    return true;
+}
+
 static bool deviceDetect(magDev_t * mag)
 {
     for (int retryCount = 0; retryCount < DETECTION_MAX_RETRY_COUNT; retryCount++) {
@@ -95,6 +164,63 @@ static bool mlx90393Init(magDev_t * mag)
 
     LOG_D(SYSTEM, "MLX90393_START_BURST_MODE cmd answer: 0x%02X", sig);
 
+    uint16_t reg_val = 0;
+    uint8_t buf[REG_BUF_LEN] = {0};
+
+    ack = busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_AND_HALLCONF_REG, buf, REG_BUF_LEN);
+
+    if (!ack) {
+        return false;
+    }
+
+    //buf[0] - status byte
+    reg_val = ((uint16_t)buf[1] << 8) | buf[2];
+
+    LOG_D(SYSTEM, "MLX90393_READ_REGISTER cmd answer: 0x%02X value: 0x%04X", buf[0], reg_val);
+
+    mlx90393.gain_sel = (reg_val & GAIN_SEL_MASK) >> GAIN_SEL_SHIFT;
+    mlx90393.hallconf = (reg_val & HALLCONF_MASK) >> HALLCONF_SHIFT;
+
+    ack = busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | TCMP_EN_REG, buf, REG_BUF_LEN);
+
+    if (!ack) {
+        return false;
+    }
+
+    //buf[0] - status byte
+    reg_val = ((uint16_t)buf[1] << 8) | buf[2];
+
+    LOG_D(SYSTEM, "MLX90393_READ_REGISTER cmd answer: 0x%02X value: 0x%04X", buf[0], reg_val);
+
+    mlx90393.tcmp_en = (reg_val & TCMP_EN_MASK) >> TCMP_EN_SHIFT;
+
+    ack = busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | RES_XYZ_REG, buf, REG_BUF_LEN);
+
+    if (!ack) {
+        return false;
+    }
+
+    //buf[0] - status byte
+    reg_val = ((uint16_t)buf[1] << 8) | buf[2];
+
+    LOG_D(SYSTEM, "MLX90393_READ_REGISTER cmd answer: 0x%02X value: 0x%04X", buf[0], reg_val);
+
+    uint8_t res_xyz = (reg_val & RES_XYZ_MASK) >> RES_XYZ_SHIFT;
+    mlx90393.res_x = (res_xyz >> 0) & 0x3;
+    mlx90393.res_y = (res_xyz >> 2) & 0x3;
+    mlx90393.res_z = (res_xyz >> 4) & 0x3;
+
+    if (mlx90393SetGainSel(mag, 7)) {
+        LOG_D(SYSTEM, "mlx90393SetGainSel unsuccessfull!");
+
+        return false;
+    }
+
+    // mlx90393SetResolution(0, 0, 0);
+    // mlx90393SetOverSampling(3);
+    // mlx90393SetDigitalFiltering(7);
+    // mlx90393SetTemperatureCompensation(0);
+
     return true;
 }
 
@@ -114,9 +240,77 @@ static bool mlx90393Read(magDev_t * mag)
 
     LOG_D(SYSTEM, "MLX90393_READ_MEASUREMENT cmd answer: 0x%02X", buf[0]);
 
-    mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[2]); //TODO:
-    mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[4]); //TODO:
-    mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[6]); //TODO:
+    int16_t raw_x = (int16_t)(buf[1] << 8 | buf[2]);
+    int16_t raw_y = (int16_t)(buf[3] << 8 | buf[4]);
+    int16_t raw_z = (int16_t)(buf[5] << 8 | buf[6]);
+
+    float xy_sens;
+    float z_sens;
+
+    switch(mlx90393.hallconf){
+    default:
+    case 0:
+        xy_sens = base_xy_sens_hc0;
+        z_sens = base_z_sens_hc0;
+        break;
+    case 0xC:
+        xy_sens = base_xy_sens_hc0xc;
+        z_sens = base_z_sens_hc0xc;
+        break;
+    }
+
+    float gain_factor = gain_multipliers[mlx90393.gain_sel & 0x7];
+
+    if (mlx90393.tcmp_en){
+        mag->magADCRaw[X] = ((raw_x - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_x));
+    } else {
+        switch(mlx90393.res_x) {
+        case 0:
+        case 1:
+            mag->magADCRaw[X] = ((int16_t)raw_x) * xy_sens * gain_factor * (1 << mlx90393.res_x);
+            break;
+        case 2:
+            mag->magADCRaw[X] = ((raw_x - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_x));
+            break;
+        case 3:
+            mag->magADCRaw[X] = ((raw_x - 16384.f) * xy_sens * gain_factor * (1 << mlx90393.res_x));
+            break;
+        }
+    }
+
+    if (mlx90393.tcmp_en){
+        mag->magADCRaw[Y] = ((raw_y - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_y));
+    } else {
+        switch(mlx90393.res_y) {
+        case 0:
+        case 1:
+            mag->magADCRaw[Y] = ((int16_t)raw_y) * xy_sens * gain_factor * (1 << mlx90393.res_y);
+            break;
+        case 2:
+            mag->magADCRaw[Y] = ((raw_y - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_y));
+            break;
+        case 3:
+            mag->magADCRaw[Y] = ((raw_y - 16384.f) * xy_sens * gain_factor * (1 << mlx90393.res_y));
+            break;
+        }
+    }
+
+    if (mlx90393.tcmp_en){
+        mag->magADCRaw[Z] = ((raw_z - 32768.f) * z_sens * gain_factor * (1 << mlx90393.res_z) );
+    } else {
+        switch(mlx90393.res_z) {
+        case 0:
+        case 1:
+            mag->magADCRaw[Z] = ((int16_t)raw_z) * z_sens * gain_factor * (1 << mlx90393.res_z);
+            break;
+        case 2:
+            mag->magADCRaw[Z] = ((raw_z - 32768.f) * z_sens * gain_factor * (1 << mlx90393.res_z));
+            break;
+        case 3:
+            mag->magADCRaw[Z] = ((raw_z - 16384.f) * z_sens * gain_factor * (1 << mlx90393.res_z));
+            break;
+        }
+    }
 
     return true;
 }

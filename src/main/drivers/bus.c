@@ -363,6 +363,77 @@ bool busRead(const busDevice_t * dev, uint8_t reg, uint8_t * data)
     }
 }
 
+bool busExtWriteBuf(const busDevice_t * dev, uint16_t reg, const uint8_t * data, uint8_t length)
+{
+    switch (dev->busType) {
+        case BUSTYPE_SPI:
+            return false;
+
+        case BUSTYPE_I2C:
+#ifdef USE_I2C
+            return i2cBusWriteBuffer(dev, reg, data, length);
+#else
+            return false;
+#endif
+
+        default:
+            return false;
+    }
+}
+
+bool busExtWrite(const busDevice_t * dev, uint16_t reg, uint8_t data)
+{
+    switch (dev->busType) {
+        case BUSTYPE_SPI:
+            return false;
+
+        case BUSTYPE_I2C:
+#ifdef USE_I2C
+            return i2cBusWriteRegister(dev, reg, data);
+#else
+            return false;
+#endif
+
+        default:
+            return false;
+    }
+}
+
+bool busExtReadBuf(const busDevice_t * dev, uint16_t reg, uint8_t * data, uint8_t length)
+{
+    switch (dev->busType) {
+        case BUSTYPE_SPI:
+            return false;
+
+        case BUSTYPE_I2C:
+#ifdef USE_I2C
+            return i2cBusReadBuffer(dev, reg, data, length);
+#else
+            return false;
+#endif
+
+        default:
+            return false;
+    }
+}
+
+bool busExtRead(const busDevice_t * dev, uint16_t reg, uint8_t * data)
+{
+    switch (dev->busType) {
+        case BUSTYPE_SPI:
+            return false;
+
+        case BUSTYPE_I2C:
+#ifdef USE_I2C
+            return i2cBusReadRegister(dev, reg, data);
+#else
+            return false;
+#endif
+        default:
+            return false;
+    }
+}
+
 void busSelectDevice(const busDevice_t * dev)
 {
 #ifdef USE_SPI
