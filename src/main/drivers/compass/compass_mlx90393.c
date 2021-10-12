@@ -82,6 +82,9 @@
 #define TCMP_EN_MASK                0x0400
 #define TCMP_EN_SHIFT               10
 
+#define BDR_EN_MASK                 0x003f
+#define BDR_EN_SHIFT                0
+
 #define RES_XYZ_OSR_DIG_FLT_REG     0x8 //from datasheet 0x2 << 2 = 0x8 
 #define RES_XYZ_MASK                0x07e0
 #define RES_XYZ_SHIFT               5
@@ -272,6 +275,9 @@ static bool mlx90393SetTemperatureCompensation(magDev_t * mag, uint8_t enabled) 
 
     new_val = (old_val & ~TCMP_EN_MASK) | (((uint16_t)tcmp_en << TCMP_EN_SHIFT) & TCMP_EN_MASK);
 
+    // By Ari Fix BDR
+    new_val = (old_val & ~BDR_EN_MASK) | (((uint16_t) 3 << BDR_EN_SHIFT) & BDR_EN_MASK);
+
     LOG_E(SYSTEM, "mlx90393SetTemperatureCompensation old_val: 0x%04X new_val: 0x%04X", old_val, new_val);
 
     buf[0] = (new_val >> 8) & 0xFF;
@@ -288,7 +294,56 @@ static bool mlx90393SetTemperatureCompensation(magDev_t * mag, uint8_t enabled) 
 }
 
 // =======================================================================================
+static bool mlx90393Read(magDev_t * mag)
+{
+    const char* func_name;
+    func_name = __func__;
 
+    uint8_t buf[7] = {0};
+
+    if (!check_ack(busReadBuf(mag->busDev, MLX90393_READ_MEASUREMENT | MLX90393_MEASURE_3D, buf, 7), func_name)){
+        mag->magADCRaw[X] = 0;
+        mag->magADCRaw[Y] = 0;
+        mag->magADCRaw[Z] = 0;
+        return false;
+    }
+
+    LOG_E(SYSTEM, "MLX90393_READ_MEASUREMENT cmd answer: 0x%02X", buf[0]);
+
+    // X
+    /*
+    if (buf[1] >> 7) {
+        // minus sign
+        mag->magADCRaw[X] = (int16_t)((~(buf[1] << 8 | buf[2]) & 0xffff) + 1);
+    } else {
+        // plus sign
+        mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[2]);
+    }
+    */
+    mag->magADCRaw[X] = (short)(buf[1] << 8 | buf[2]);
+
+    // Y
+    if (buf[3] >> 7) {
+        // minus sign
+        mag->magADCRaw[Y] = (int16_t)((~(buf[3] << 8 | buf[4]) & 0xffff) + 1);
+    } else {
+        // plus sign
+        mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[4]);
+    }
+
+    // Z
+    if (buf[5] >> 7) {
+        // minus sign
+        mag->magADCRaw[Z] = (int16_t)((~(buf[5] << 8 | buf[6]) & 0xffff) + 1);
+    } else {
+        // plus sign
+        mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[6]);
+    }
+   
+    return true;
+
+}
+/*
 static bool mlx90393Read(magDev_t * mag)
 {
     const char* func_name;
@@ -379,6 +434,7 @@ static bool mlx90393Read(magDev_t * mag)
 
     return true;
 }
+*/
 
 static bool deviceDetect(magDev_t * mag)
 {
@@ -477,13 +533,15 @@ static bool mlx90393Init(magDev_t * mag)
 
     nop_command(mag);
 
-    if (!mlx90393SetDigitalFiltering(mag, 7)) {
+    // Old Value 7
+    if (!mlx90393SetDigitalFiltering(mag, 5)) {
         LOG_E(SYSTEM, "mlx90393SetDigitalFiltering unsuccessfull!");
         return false;
     }
 
     nop_command(mag);
 
+    // AND BDR Here too
     if (!mlx90393SetTemperatureCompensation(mag, 0)) {
         LOG_E(SYSTEM, "mlx90393SetTemperatureCompensation unsuccessfull!");
         return false;
