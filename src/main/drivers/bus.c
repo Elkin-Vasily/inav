@@ -407,7 +407,7 @@ bool busExtReadBuf(const busDevice_t * dev, uint16_t reg, uint8_t * data, uint8_
 
         case BUSTYPE_I2C:
 #ifdef USE_I2C
-            return i2cBusReadBuffer(dev, reg, data, length);
+            return i2cBusExtReadBuffer(dev, reg, data, length);
 #else
             return false;
 #endif

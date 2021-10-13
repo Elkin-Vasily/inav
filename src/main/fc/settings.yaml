@@ -3686,7 +3686,7 @@ groups:
           min: 0
           max: UINT32_MAX
           description: "Defines serial debugging log topic. See `docs/development/serial_printf_debugging.md` for usage."
-          default_value: 0
+          default_value: 1
 
   - name: PG_ESC_SENSOR_CONFIG
     type: escSensorConfig_t
