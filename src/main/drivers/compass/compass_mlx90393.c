@@ -152,6 +152,13 @@ static bool mlx90393SetGainSel(magDev_t * mag, uint8_t gain_sel)
 
     new_val = (old_val & ~GAIN_SEL_MASK) | (((uint16_t)gain_sel << GAIN_SEL_SHIFT) & GAIN_SEL_MASK);
 
+    // By Ari   GAIN 7 Hall C
+    new_val = ((uint16_t)0x00 << 8) | 0xFC;
+    // By Ari   GAIN 7 Hall 0
+    // new_val = ((uint16_t)0x00 << 8) | 0xF0;
+    // GAIN 0 Hall 0
+    // new_val = ((uint16_t)0x00 << 8) | 0x80;
+
     LOG_E(SYSTEM, "mlx90393SetGainSel readres: 0x%02X old_val: 0x%04X new_val: 0x%04X", buf[0], old_val, new_val);
 
     buf[0] = (new_val >> 8) & 0xFF;
@@ -162,17 +169,6 @@ static bool mlx90393SetGainSel(magDev_t * mag, uint8_t gain_sel)
     if (!check_ack(busWriteBuf(mag->busDev, MLX90393_WRITE_REGISTER, buf, REG_BUF_LEN), func_name)){
         return false;
     }
-    
-    delay(20);
-
-    LOG_E(SYSTEM, "Trying to REREAD register... ");
-
-    // READ AGAIN
-    if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_HALLCONF_REG, buf, REG_BUF_LEN) , func_name)) {
-        LOG_E(SYSTEM, "Can't reread register!");
-        return false;
-    }
-    LOG_E(SYSTEM, "received from read gain again status: 0x%02X result: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
 
     mlx90393.gain_sel = gain_sel;
 
@@ -292,6 +288,13 @@ static bool mlx90393SetTemperatureCompensation(magDev_t * mag, uint8_t enabled) 
     // By Ari Fix BDR
     new_val = (old_val & ~BDR_EN_MASK) | (((uint16_t) 3 << BDR_EN_SHIFT) & BDR_EN_MASK);
 
+    // By Ari 0003 BDR = 1
+    // new_val = ((uint16_t)0b01100010 << 8) | 0b11000001;
+    // By Ari 0003 BDR = 5
+    // new_val = ((uint16_t)0b01100010 << 8) | 0b11000101;
+    // With TEMPERATURE
+    new_val = ((uint16_t)0b01100110 << 8) | 0b11000001;
+
     LOG_E(SYSTEM, "mlx90393SetTemperatureCompensation old_val: 0x%04X new_val: 0x%04X", old_val, new_val);
 
     buf[0] = (new_val >> 8) & 0xFF;
@@ -334,26 +337,10 @@ static bool mlx90393Read(magDev_t * mag)
         mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[2]);
     }
     */
-    mag->magADCRaw[X] = (short)(buf[1] << 8 | buf[2]);
+    mag->magADCRaw[X] = ((short)(buf[1] << 8 | buf[2]));
+    mag->magADCRaw[Y] = ((short)(buf[3] << 8 | buf[4]));
+    mag->magADCRaw[Z] = ((short)(buf[5] << 8 | buf[6]));
 
-    // Y
-    if (buf[3] >> 7) {
-        // minus sign
-        mag->magADCRaw[Y] = (int16_t)((~(buf[3] << 8 | buf[4]) & 0xffff) + 1);
-    } else {
-        // plus sign
-        mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[4]);
-    }
-
-    // Z
-    if (buf[5] >> 7) {
-        // minus sign
-        mag->magADCRaw[Z] = (int16_t)((~(buf[5] << 8 | buf[6]) & 0xffff) + 1);
-    } else {
-        // plus sign
-        mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[6]);
-    }
-   
     return true;
 
 }
@@ -478,6 +465,10 @@ static bool mlx90393Init(magDev_t * mag)
 
     uint8_t sig = 0;
 
+    nop_command(mag);
+    delay(20);
+    nop_command(mag);
+
     if (!check_ack(busRead(mag->busDev, MLX90393_EXIT_MODE, &sig), func_name)){
         LOG_E(SYSTEM, "Exit from previous mode success.");
     } else {
@@ -534,42 +525,73 @@ static bool mlx90393Init(magDev_t * mag)
     mlx90393.res_y = (res_xyz >> 2) & 0x3;
     mlx90393.res_z = (res_xyz >> 4) & 0x3;
 
+    // REGISTER 1
     if (!mlx90393SetGainSel(mag, 7)) {
         LOG_E(SYSTEM, "mlx90393SetGainSel unsuccessfull!");
         return false;
     }
-    delay(200);
+    delay(20);
     nop_command(mag);
 
+    // REGISTER 3
     if (!mlx90393SetResolution(mag, 0, 0, 0)) {
         LOG_E(SYSTEM, "mlx90393SetResolution unsuccessfull!");
         return false;
     }
-    delay(200);
+    delay(20);
     nop_command(mag);
 
+    // REGISTER 3
     if (!mlx90393SetOverSampling(mag, 3)) {
         LOG_E(SYSTEM, "mlx90393SetOverSampling unsuccessfull!");
         return false;
     }
-    delay(200);
+    delay(20);
     nop_command(mag);
 
-    // Old Value 7
-    if (!mlx90393SetDigitalFiltering(mag, 5)) {
+    // REGISTER 3
+    if (!mlx90393SetDigitalFiltering(mag, 0)) {
         LOG_E(SYSTEM, "mlx90393SetDigitalFiltering unsuccessfull!");
         return false;
     }
-    delay(200);
+    delay(20);
     nop_command(mag);
 
     // AND BDR Here too
+    // REGISTER 2
     if (!mlx90393SetTemperatureCompensation(mag, 0)) {
         LOG_E(SYSTEM, "mlx90393SetTemperatureCompensation unsuccessfull!");
         return false;
     }
-    delay(200);
+    delay(20);
     nop_command(mag);
+
+    // READ REGISTERS AGAIN =======================================
+    // 1 REGISTER
+    if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_HALLCONF_REG, buf, REG_BUF_LEN), func_name)){
+        return false;
+    }
+
+    delay(20);
+    LOG_E(SYSTEM, "MLX90393_READ_REGISTER 1 AGAIN: cmd answer: 0x%02X value: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
+
+    // 2 REGISTER
+    if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | TCMP_EN_REG, buf, REG_BUF_LEN), func_name)){
+        return false;
+    }
+
+    delay(20);
+    LOG_E(SYSTEM, "MLX90393_READ_REGISTER 2 AGAIN: cmd answer: 0x%02X value: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
+
+    // 3 REGISTER
+    if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | RES_XYZ_OSR_DIG_FLT_REG, buf, REG_BUF_LEN), func_name)){
+        return false;
+    }
+
+    delay(20);
+    LOG_E(SYSTEM, "MLX90393_READ_REGISTER 3 AGAIN: cmd answer: 0x%02X value: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
+
+    // END READING REGISTERS AGAIN...
 
     if (!check_ack(busRead(mag->busDev, MLX90393_START_BURST_MODE | MLX90393_MEASURE_3D, &sig), func_name)){
         return false;
