@@ -77,6 +77,9 @@
 #define GAIN_SEL_SHIFT              4
 #define HALLCONF_MASK               0x000f
 #define HALLCONF_SHIFT              0
+#define Z_SERIES_MASK               0x0080
+#define Z_SERIES_SHIFT              7
+
 
 #define TCMP_EN_REG                 0x4 //from datasheet 0x1 << 2 = 0x4
 #define TCMP_EN_MASK                0x0400
@@ -152,13 +155,6 @@ static bool mlx90393SetGainSel(magDev_t * mag, uint8_t gain_sel)
 
     new_val = (old_val & ~GAIN_SEL_MASK) | (((uint16_t)gain_sel << GAIN_SEL_SHIFT) & GAIN_SEL_MASK);
 
-    // By Ari   GAIN 7 Hall C
-    new_val = ((uint16_t)0x00 << 8) | 0xFC;
-    // By Ari   GAIN 7 Hall 0
-    // new_val = ((uint16_t)0x00 << 8) | 0xF0;
-    // GAIN 0 Hall 0
-    // new_val = ((uint16_t)0x00 << 8) | 0x80;
-
     LOG_E(SYSTEM, "mlx90393SetGainSel readres: 0x%02X old_val: 0x%04X new_val: 0x%04X", buf[0], old_val, new_val);
 
     buf[0] = (new_val >> 8) & 0xFF;
@@ -171,6 +167,74 @@ static bool mlx90393SetGainSel(magDev_t * mag, uint8_t gain_sel)
     }
 
     mlx90393.gain_sel = gain_sel;
+
+    return true;
+}
+
+static bool mlx90393SetHallConf(magDev_t * mag, uint8_t hall_conf)
+{
+    const char* func_name;
+    func_name = __func__;
+
+    uint16_t old_val, new_val;
+    uint8_t buf[REG_BUF_LEN] = {0};
+    
+    // FIRST READ
+    if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_HALLCONF_REG, buf, REG_BUF_LEN) , func_name)) {
+        return false;
+    }
+    delay(20);
+
+    //buf[0] - status byte
+    old_val = ((uint16_t)buf[1] << 8) | buf[2];
+
+    new_val = (old_val & ~HALLCONF_MASK) | (((uint16_t)hall_conf << HALLCONF_SHIFT) & HALLCONF_MASK);
+    
+
+    LOG_E(SYSTEM, "mlx90393SetHallConf readres: 0x%02X old_val: 0x%04X new_val: 0x%04X", buf[0], old_val, new_val);
+
+    buf[0] = (new_val >> 8) & 0xFF;
+    buf[1] = (new_val >> 0) & 0xFF;
+    buf[2] = GAIN_SEL_HALLCONF_REG;
+
+    // WRITE
+    if (!check_ack(busWriteBuf(mag->busDev, MLX90393_WRITE_REGISTER, buf, REG_BUF_LEN), func_name)){
+        return false;
+    }
+
+    return true;
+}
+
+static bool mlx90393SetZSeries(magDev_t * mag, uint8_t z_series)
+{
+    const char* func_name;
+    func_name = __func__;
+
+    uint16_t old_val, new_val;
+    uint8_t buf[REG_BUF_LEN] = {0};
+    
+    // FIRST READ
+    if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_HALLCONF_REG, buf, REG_BUF_LEN) , func_name)) {
+        return false;
+    }
+    delay(20);
+
+    //buf[0] - status byte
+    old_val = ((uint16_t)buf[1] << 8) | buf[2];
+
+    new_val = (old_val & ~Z_SERIES_MASK) | (((uint16_t)z_series << Z_SERIES_SHIFT) & Z_SERIES_MASK);
+    
+
+    LOG_E(SYSTEM, "mlx90393SetZSeries readres: 0x%02X old_val: 0x%04X new_val: 0x%04X", buf[0], old_val, new_val);
+
+    buf[0] = (new_val >> 8) & 0xFF;
+    buf[1] = (new_val >> 0) & 0xFF;
+    buf[2] = GAIN_SEL_HALLCONF_REG;
+
+    // WRITE
+    if (!check_ack(busWriteBuf(mag->busDev, MLX90393_WRITE_REGISTER, buf, REG_BUF_LEN), func_name)){
+        return false;
+    }
 
     return true;
 }
@@ -285,16 +349,6 @@ static bool mlx90393SetTemperatureCompensation(magDev_t * mag, uint8_t enabled) 
 
     new_val = (old_val & ~TCMP_EN_MASK) | (((uint16_t)tcmp_en << TCMP_EN_SHIFT) & TCMP_EN_MASK);
 
-    // By Ari Fix BDR
-    new_val = (old_val & ~BDR_EN_MASK) | (((uint16_t) 3 << BDR_EN_SHIFT) & BDR_EN_MASK);
-
-    // By Ari 0003 BDR = 1
-    // new_val = ((uint16_t)0b01100010 << 8) | 0b11000001;
-    // By Ari 0003 BDR = 5
-    // new_val = ((uint16_t)0b01100010 << 8) | 0b11000101;
-    // With TEMPERATURE
-    new_val = ((uint16_t)0b01100110 << 8) | 0b11000001;
-
     LOG_E(SYSTEM, "mlx90393SetTemperatureCompensation old_val: 0x%04X new_val: 0x%04X", old_val, new_val);
 
     buf[0] = (new_val >> 8) & 0xFF;
@@ -306,6 +360,34 @@ static bool mlx90393SetTemperatureCompensation(magDev_t * mag, uint8_t enabled) 
     }
 
     mlx90393.tcmp_en = tcmp_en;
+    
+    return true;
+}
+
+static bool mlx90393SetBurstDataRate(magDev_t * mag, uint8_t bdr) {
+    const char* func_name;
+    func_name = __func__;
+
+    uint16_t old_val, new_val;
+    uint8_t buf[REG_BUF_LEN] = {0};
+
+    if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | TCMP_EN_REG, buf, REG_BUF_LEN), func_name)){
+        return false;
+    }
+
+    //buf[0] - status byte
+    old_val = ((uint16_t)buf[1] << 8) | buf[2];
+    new_val = (old_val & ~BDR_EN_MASK) | (((uint16_t) bdr << BDR_EN_SHIFT) & BDR_EN_MASK);
+
+    LOG_E(SYSTEM, "mlx90393SetBurstDataRate old_val: 0x%04X new_val: 0x%04X", old_val, new_val);
+
+    buf[0] = (new_val >> 8) & 0xFF;
+    buf[1] = (new_val >> 0) & 0xFF;
+    buf[2] = TCMP_EN_REG;
+
+    if (!check_ack(busWriteBuf(mag->busDev, MLX90393_WRITE_REGISTER, buf, REG_BUF_LEN), func_name)){
+        return false;
+    }
     
     return true;
 }
@@ -327,19 +409,54 @@ static bool mlx90393Read(magDev_t * mag)
 
     LOG_E(SYSTEM, "MLX90393_READ_MEASUREMENT cmd answer: 0x%02X", buf[0]);
 
-    // X
-    /*
+    // READING. (Different resolution - different encoding.)
+
+    // 2's complement MANUAL. For Res 0-1
+    /* 
     if (buf[1] >> 7) {
         // minus sign
         mag->magADCRaw[X] = (int16_t)((~(buf[1] << 8 | buf[2]) & 0xffff) + 1);
+        mag->magADCRaw[Y] = (int16_t)((~(buf[3] << 8 | buf[4]) & 0xffff) + 1);
+        mag->magADCRaw[Z] = (int16_t)((~(buf[5] << 8 | buf[6]) & 0xffff) + 1);
     } else {
         // plus sign
         mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[2]);
-    }
-    */
+        mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[4]);
+        mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[6]);
+    } */
+    
+    // 2's complement Auto. For Res 0-1
     mag->magADCRaw[X] = ((short)(buf[1] << 8 | buf[2]));
     mag->magADCRaw[Y] = ((short)(buf[3] << 8 | buf[4]));
     mag->magADCRaw[Z] = ((short)(buf[5] << 8 | buf[6]));
+
+    // Unsigned Manual. For Res 2
+    /* 
+    if (buf[1] >> 7) {
+        // minus sign
+        mag->magADCRaw[X] = (int16_t)((buf[1] << 8 | buf[2]) & 0x7FFF);
+        mag->magADCRaw[Y] = (int16_t)((buf[3] << 8 | buf[4]) & 0x7FFF);
+        mag->magADCRaw[Z] = (int16_t)((buf[5] << 8 | buf[6]) & 0x7FFF);
+    } else {
+        // plus sign
+        mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[2]);
+        mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[4]);
+        mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[6]);
+    } */
+
+    // Unsigned Manual. For Res 3
+    /* 
+    if (buf[1] >> 6) {
+        // minus sign
+        mag->magADCRaw[X] = (int16_t)((buf[1] << 8 | buf[2]) & 0x3FFF);
+        mag->magADCRaw[Y] = (int16_t)((buf[3] << 8 | buf[4]) & 0x3FFF);
+        mag->magADCRaw[Z] = (int16_t)((buf[5] << 8 | buf[6]) & 0x3FFF);
+    } else {
+        // plus sign
+        mag->magADCRaw[X] = (int16_t)(buf[1] << 8 | buf[2]);
+        mag->magADCRaw[Y] = (int16_t)(buf[3] << 8 | buf[4]);
+        mag->magADCRaw[Z] = (int16_t)(buf[5] << 8 | buf[6]);
+    } */
 
     return true;
 
@@ -525,7 +642,20 @@ static bool mlx90393Init(magDev_t * mag)
     mlx90393.res_y = (res_xyz >> 2) & 0x3;
     mlx90393.res_z = (res_xyz >> 4) & 0x3;
 
-    // REGISTER 1
+    // 1 Tl = 10000 Gs
+    // 1 mTl = 10 Gs
+    // 1 mTl = 10000 mGs
+    // 1 mkTl = 10 mGs
+
+    // REGISTER 1. Recommended 7. (+- 49Gs) 
+    // Gain Selector (3 bits)
+    // For Hall_Conf 0xC And Resolution 0
+    // 0 - .787 mkTl per LSB
+    // 7 - .157 mkTl per LSB
+    // For Hall_Conf 0xC And Resolution 3
+    // 0 - 6.0097 mkTl per LSB
+    // 7 - 1.202 mkTl per LSB
+    
     if (!mlx90393SetGainSel(mag, 7)) {
         LOG_E(SYSTEM, "mlx90393SetGainSel unsuccessfull!");
         return false;
@@ -533,32 +663,35 @@ static bool mlx90393Init(magDev_t * mag)
     delay(20);
     nop_command(mag);
 
-    // REGISTER 3
-    if (!mlx90393SetResolution(mag, 0, 0, 0)) {
-        LOG_E(SYSTEM, "mlx90393SetResolution unsuccessfull!");
+    // REGISTER 1. Recommended 12 or 0.
+    // Hall Plate spinning rate adjustment (4 bits)
+    if (!mlx90393SetHallConf(mag, 12)) {
+        LOG_E(SYSTEM, "mlx90393SetHallConf unsuccessfull!");
         return false;
     }
     delay(20);
     nop_command(mag);
 
-    // REGISTER 3
-    if (!mlx90393SetOverSampling(mag, 3)) {
-        LOG_E(SYSTEM, "mlx90393SetOverSampling unsuccessfull!");
+    // REGISTER 1. Recommended 1.
+    // Activate Z-axis (1 bit)
+    if (!mlx90393SetZSeries(mag, 1)) {
+        LOG_E(SYSTEM, "mlx90393SetZSeries unsuccessfull!");
         return false;
     }
     delay(20);
     nop_command(mag);
 
-    // REGISTER 3
-    if (!mlx90393SetDigitalFiltering(mag, 0)) {
-        LOG_E(SYSTEM, "mlx90393SetDigitalFiltering unsuccessfull!");
+    // REGISTER 2. 
+    // Burst Data Rate (6 bit). Time of rate = BURST_DATA_RATE * 20ms. For inav=100ms (BDR=5). 1 and 3 - good too.
+    if (!mlx90393SetBurstDataRate(mag, 4)) {
+        LOG_E(SYSTEM, "mlx90393SetBurstDataRate unsuccessfull!");
         return false;
     }
     delay(20);
     nop_command(mag);
 
-    // AND BDR Here too
-    // REGISTER 2
+    // REGISTER 2. 0 or 1
+    // Temperature compensation (1 bit)
     if (!mlx90393SetTemperatureCompensation(mag, 0)) {
         LOG_E(SYSTEM, "mlx90393SetTemperatureCompensation unsuccessfull!");
         return false;
@@ -566,14 +699,66 @@ static bool mlx90393Init(magDev_t * mag)
     delay(20);
     nop_command(mag);
 
-    // READ REGISTERS AGAIN =======================================
+    // REGISTER 3. (0-3)
+    // Resolution for 3 axis (2 bits per axis)
+    //              Temperature compensation: 0                         1
+    // Res0. +- 2^15. 0mkTl=0LSB. Encoding: 2's complement.     0mkTl = 2^15LSB Encoding: unsigned.
+    // Res1. +- 2^15. 0mkTl=0LSB. Encoding: 2's complement.     0mkTl = 2^15LSB Encoding: unsigned.
+    // Res2. +- 22000. 0mkTl=2^15LSB. Encoding: unsigned.               NONE
+    // Res3. +- 11000. 0mkTl=2^14LSB. Encoding: unsigned.               NONE
+    
+    // Res0 gain 7 - +- 51 Gs. (+- 0.0051 Tl)
+    // Res3 gain 7 - +-138 Gs.
+    // Res0 gain 0 - +-257 Gs.
+    // Res3 gain 0 - +-692 Gs. (+- 0.0692 Tl)
+
+    // Earth                    .5 Gs   (0.00005 Tl) 50mkTl
+    // Small Magnet(Ferrit)     100 Gs  (0.01 Tl)    10000mkTl
+    // Small Magnet(Neodium)    2000 Gs (0.2 Tl)     200000mkTl
+    
+    // Earth           0.25 Gs - 0.65 Gs.
+
+    if (!mlx90393SetResolution(mag, 0, 0, 0)) {
+        LOG_E(SYSTEM, "mlx90393SetResolution unsuccessfull!");
+        return false;
+    }
+    delay(20);
+    nop_command(mag);
+
+    // Digital filtering/OSR to BDR
+    //          OSR:    0   1   2   3
+    //                  --------------
+    // Filtering 5:     1   1   2   3
+    // Filtering 6:     1   2   3   ~>5
+    // Filtering 7:     2   3   ~>5   ~>10
+
+    // REGISTER 3. 0-3. 3 - maximum OSR. Affects BDR
+    // Oversampling (2 bits).
+    if (!mlx90393SetOverSampling(mag, 3)) {
+        LOG_E(SYSTEM, "mlx90393SetOverSampling unsuccessfull!");
+        return false;
+    }
+    delay(20);
+    nop_command(mag);
+
+    // REGISTER 3. 0-7. 7 - maximum. Affects BDR
+    // Digital Filtering
+    if (!mlx90393SetDigitalFiltering(mag, 5)) {
+        LOG_E(SYSTEM, "mlx90393SetDigitalFiltering unsuccessfull!");
+        return false;
+    }
+    delay(20);
+    nop_command(mag);
+
+
+    // READ REGISTERS AGAIN ==============================================================================
     // 1 REGISTER
     if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_HALLCONF_REG, buf, REG_BUF_LEN), func_name)){
         return false;
     }
 
     delay(20);
-    LOG_E(SYSTEM, "MLX90393_READ_REGISTER 1 AGAIN: cmd answer: 0x%02X value: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
+    LOG_E(SYSTEM, "MLX90393_READ_REGISTER 1 AGAIN(Need 0x00FC): cmd answer: 0x%02X value: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
 
     // 2 REGISTER
     if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | TCMP_EN_REG, buf, REG_BUF_LEN), func_name)){
@@ -581,7 +766,7 @@ static bool mlx90393Init(magDev_t * mag)
     }
 
     delay(20);
-    LOG_E(SYSTEM, "MLX90393_READ_REGISTER 2 AGAIN: cmd answer: 0x%02X value: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
+    LOG_E(SYSTEM, "MLX90393_READ_REGISTER 2 AGAIN(Need 0x62C1): cmd answer: 0x%02X value: 0x%04X", buf[0], ((uint16_t)buf[1] << 8) | buf[2]);
 
     // 3 REGISTER
     if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | RES_XYZ_OSR_DIG_FLT_REG, buf, REG_BUF_LEN), func_name)){
