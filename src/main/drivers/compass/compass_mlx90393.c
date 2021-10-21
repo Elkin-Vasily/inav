@@ -446,7 +446,7 @@ static bool mlx90393Read(magDev_t * mag)
 
     // Unsigned Manual. For Res 3
     /* 
-    if (buf[1] >> 6) {
+    if ((buf[1] >> 6) & 0x1) {
         // minus sign
         mag->magADCRaw[X] = (int16_t)((buf[1] << 8 | buf[2]) & 0x3FFF);
         mag->magADCRaw[Y] = (int16_t)((buf[3] << 8 | buf[4]) & 0x3FFF);
@@ -461,98 +461,6 @@ static bool mlx90393Read(magDev_t * mag)
     return true;
 
 }
-/*
-static bool mlx90393Read(magDev_t * mag)
-{
-    const char* func_name;
-    func_name = __func__;
-
-    uint8_t buf[7] = {0};
-
-    if (!check_ack(busReadBuf(mag->busDev, MLX90393_READ_MEASUREMENT | MLX90393_MEASURE_3D, buf, 7), func_name)){
-        mag->magADCRaw[X] = 0;
-        mag->magADCRaw[Y] = 0;
-        mag->magADCRaw[Z] = 0;
-        return false;
-    }
-
-    LOG_E(SYSTEM, "MLX90393_READ_MEASUREMENT cmd answer: 0x%02X", buf[0]);
-
-    int16_t raw_x = (int16_t)(buf[1] << 8 | buf[2]);
-    int16_t raw_y = (int16_t)(buf[3] << 8 | buf[4]);
-    int16_t raw_z = (int16_t)(buf[5] << 8 | buf[6]);
-
-    float xy_sens;
-    float z_sens;
-
-    switch(mlx90393.hallconf){
-    default:
-    case 0:
-        xy_sens = base_xy_sens_hc0;
-        z_sens = base_z_sens_hc0;
-        break;
-    case 0xC:
-        xy_sens = base_xy_sens_hc0xc;
-        z_sens = base_z_sens_hc0xc;
-        break;
-    }
-
-    float gain_factor = gain_multipliers[mlx90393.gain_sel & 0x7];
-
-    if (mlx90393.tcmp_en){
-        mag->magADCRaw[X] = ((raw_x - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_x));
-    } else {
-        switch(mlx90393.res_x) {
-        case 0:
-        case 1:
-            mag->magADCRaw[X] = ((int16_t)raw_x) * xy_sens * gain_factor * (1 << mlx90393.res_x);
-            break;
-        case 2:
-            mag->magADCRaw[X] = ((raw_x - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_x));
-            break;
-        case 3:
-            mag->magADCRaw[X] = ((raw_x - 16384.f) * xy_sens * gain_factor * (1 << mlx90393.res_x));
-            break;
-        }
-    }
-
-    if (mlx90393.tcmp_en){
-        mag->magADCRaw[Y] = ((raw_y - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_y));
-    } else {
-        switch(mlx90393.res_y) {
-        case 0:
-        case 1:
-            mag->magADCRaw[Y] = ((int16_t)raw_y) * xy_sens * gain_factor * (1 << mlx90393.res_y);
-            break;
-        case 2:
-            mag->magADCRaw[Y] = ((raw_y - 32768.f) * xy_sens * gain_factor * (1 << mlx90393.res_y));
-            break;
-        case 3:
-            mag->magADCRaw[Y] = ((raw_y - 16384.f) * xy_sens * gain_factor * (1 << mlx90393.res_y));
-            break;
-        }
-    }
-
-    if (mlx90393.tcmp_en){
-        mag->magADCRaw[Z] = ((raw_z - 32768.f) * z_sens * gain_factor * (1 << mlx90393.res_z) );
-    } else {
-        switch(mlx90393.res_z) {
-        case 0:
-        case 1:
-            mag->magADCRaw[Z] = ((int16_t)raw_z) * z_sens * gain_factor * (1 << mlx90393.res_z);
-            break;
-        case 2:
-            mag->magADCRaw[Z] = ((raw_z - 32768.f) * z_sens * gain_factor * (1 << mlx90393.res_z));
-            break;
-        case 3:
-            mag->magADCRaw[Z] = ((raw_z - 16384.f) * z_sens * gain_factor * (1 << mlx90393.res_z));
-            break;
-        }
-    }
-
-    return true;
-}
-*/
 
 static bool deviceDetect(magDev_t * mag)
 {
@@ -673,8 +581,8 @@ static bool mlx90393Init(magDev_t * mag)
     nop_command(mag);
 
     // REGISTER 1. Recommended 1.
-    // Activate Z-axis (1 bit)
-    if (!mlx90393SetZSeries(mag, 1)) {
+    // Activate Z-axis (1 bit). Usual 1.
+    if (!mlx90393SetZSeries(mag, 0)) {
         LOG_E(SYSTEM, "mlx90393SetZSeries unsuccessfull!");
         return false;
     }
@@ -733,8 +641,8 @@ static bool mlx90393Init(magDev_t * mag)
     // Filtering 7:     2   3   ~>5   ~>10
 
     // REGISTER 3. 0-3. 3 - maximum OSR. Affects BDR
-    // Oversampling (2 bits).
-    if (!mlx90393SetOverSampling(mag, 3)) {
+    // Oversampling (2 bits). Usual 3.
+    if (!mlx90393SetOverSampling(mag, 1)) {
         LOG_E(SYSTEM, "mlx90393SetOverSampling unsuccessfull!");
         return false;
     }
@@ -742,8 +650,8 @@ static bool mlx90393Init(magDev_t * mag)
     nop_command(mag);
 
     // REGISTER 3. 0-7. 7 - maximum. Affects BDR
-    // Digital Filtering
-    if (!mlx90393SetDigitalFiltering(mag, 5)) {
+    // Digital Filtering. Usual 5.
+    if (!mlx90393SetDigitalFiltering(mag, 7)) {
         LOG_E(SYSTEM, "mlx90393SetDigitalFiltering unsuccessfull!");
         return false;
     }
@@ -751,7 +659,7 @@ static bool mlx90393Init(magDev_t * mag)
     nop_command(mag);
 
 
-    // READ REGISTERS AGAIN ==============================================================================
+    // READ REGISTERS AGAIN ====================================================
     // 1 REGISTER
     if (!check_ack(busExtReadBuf(mag->busDev, ((uint16_t)MLX90393_READ_REGISTER << 8) | GAIN_SEL_HALLCONF_REG, buf, REG_BUF_LEN), func_name)){
         return false;
