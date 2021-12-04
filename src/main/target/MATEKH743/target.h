@@ -89,10 +89,15 @@
 #define SPI3_MISO_PIN           PB4
 #define SPI3_MOSI_PIN           PB5
 
-#define USE_MAG_RM3100
-#define RM3100_CS_PIN           PE2   //CS2 pad
+// #define USE_MAG_RM3100
+// #define RM3100_CS_PIN           PE2   //CS2 pad
+// //                              PD4   //CS1 pad
+// #define RM3100_SPI_BUS          BUS_SPI3
+
+#define USE_OPFLOW_MSP_SPI
+#define OPFLOW_MSP_SPI_CS_PIN   PE2   //CS2 pad
 //                              PD4   //CS1 pad
-#define RM3100_SPI_BUS          BUS_SPI3
+#define OPFLOW_MSP_SPI_SPI_BUS  BUS_SPI3
 
 // *************** I2C /Baro/Mag *********************
 #define USE_I2C

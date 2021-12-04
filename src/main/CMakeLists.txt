@@ -205,6 +205,8 @@ main_sources(COMMON_SRC
     drivers/opflow/opflow_fake.h
     drivers/opflow/opflow_virtual.c
     drivers/opflow/opflow_virtual.h
+    drivers/opflow/opflow_msp_spi.c
+    drivers/opflow/opflow_msp_spi.h    
 
     drivers/osd.c
     drivers/osd.h

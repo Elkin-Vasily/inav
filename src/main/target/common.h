@@ -109,6 +109,7 @@
 #define USE_OPFLOW
 #define USE_OPFLOW_CXOF
 #define USE_OPFLOW_MSP
+#define USE_OPFLOW_MSP_SPI
 
 // Allow default airspeed sensors
 #define USE_PITOT

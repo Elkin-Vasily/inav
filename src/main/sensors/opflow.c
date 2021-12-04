@@ -47,6 +47,7 @@
 #include "drivers/opflow/opflow.h"
 #include "drivers/opflow/opflow_fake.h"
 #include "drivers/opflow/opflow_virtual.h"
+#include "drivers/opflow/opflow_msp_spi.h"
 
 #include "fc/config.h"
 #include "fc/runtime_config.h"
@@ -113,6 +114,14 @@ static bool opflowDetect(opflowDev_t * dev, uint8_t opflowHardwareToUse)
             }
 #endif
             break;
+
+        case OPFLOW_MSP_SPI:
+#if defined(USE_OPFLOW_MSP_SPI)
+            if (mspSpiOpflowDetect(dev)) {
+                opflowHardware = OPFLOW_MSP_SPI;
+            }
+#endif
+            break;    
 
         case OPFLOW_NONE:
             opflowHardware = OPFLOW_NONE;
