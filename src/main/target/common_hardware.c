@@ -267,6 +267,12 @@
     BUSDEV_REGISTER_I2C(busdev_mlx90393,     DEVHW_MLX90393,      MLX90393_I2C_BUS,    0x0C,               NONE,           DEVFLAGS_NONE,  0);
 #endif
 
+#if defined(USE_OPFLOW_MSP_SPI)
+    #if defined(OPFLOW_MSP_SPI_SPI_BUS)
+    BUSDEV_REGISTER_SPI(busdev_opflow_msp_spi,      DEVHW_OPFLOW_MSP_SPI,       OPFLOW_MSP_SPI_SPI_BUS,     OPFLOW_MSP_SPI_CS_PIN,      NONE,           DEVFLAGS_NONE,  0);
+    #endif
+#endif
+
 #endif
 
 

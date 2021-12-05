@@ -142,6 +142,9 @@ typedef enum {
     DEVHW_US42,
     DEVHW_TOF10120_I2C,
 
+    /* Opflow sensors */
+    DEVHW_OPFLOW_MSP_SPI,
+
     /* Other hardware */
     DEVHW_MS4525,       // Pitot meter
     DEVHW_PCA9685,      // PWM output device
